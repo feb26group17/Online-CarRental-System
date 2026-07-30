@@ -71,19 +71,15 @@ public class AuthService {
 
         Customer customer = customerRepository.save(Customer.builder()
                 .userId(user.getId())
-                .fullName(req.getFullName())
-                .email(req.getEmail())
-                .phone(req.getPhone())
                 .address(req.getAddress())
                 .drivingLicense(req.getDrivingLicense())
-                .password(encodedPassword)
                 .build());
 
         return AuthResponse.builder()
                 .id(customer.getCustomerId())
                 .userId(user.getId())
-                .fullName(customer.getFullName())
-                .email(customer.getEmail())
+                .fullName(user.getName())
+                .email(user.getEmail())
                 .role(Role.CUSTOMER)
                 .message("Registration successful. Please login to continue.")
                 .build();
@@ -113,20 +109,16 @@ public class AuthService {
 
         CarOwner owner = carOwnerRepository.save(CarOwner.builder()
                 .userId(user.getId())
-                .fullName(req.getFullName())
-                .email(req.getEmail())
-                .phone(req.getPhone())
                 .address(req.getAddress())
                 .drivingLicense(req.getDrivingLicense())
-                .password(encodedPassword)
                 .status(OwnerStatus.Pending)
                 .build());
 
         return AuthResponse.builder()
                 .id(owner.getOwnerId())
                 .userId(user.getId())
-                .fullName(owner.getFullName())
-                .email(owner.getEmail())
+                .fullName(user.getName())
+                .email(user.getEmail())
                 .role(Role.OWNER)
                 .message("Registration successful. Your account is pending admin approval.")
                 .build();
