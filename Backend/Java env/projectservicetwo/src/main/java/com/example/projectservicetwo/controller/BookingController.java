@@ -1,5 +1,5 @@
 package com.example.projectservicetwo.controller;
 
-public class BrandController {
+public class BookingController {
 
 }
