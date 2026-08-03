@@ -7,8 +7,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
-
+/**
+ * Role-specific profile only — name, phone, address and adhar_card all
+ * come from `users` now. This table just links a customer back to their
+ * `users` row and holds the one customer-specific field, driving_license.
+ */
 @Entity
 @Table(name = "customer")
 @Getter
@@ -27,12 +30,6 @@ public class Customer {
     @Column(name = "user_id", nullable = false, unique = true)
     private Integer userId;
 
-    @Column(name = "address", columnDefinition = "TEXT")
-    private String address;
-
     @Column(name = "driving_license", length = 50)
     private String drivingLicense;
-
-    @Column(name = "created_at", insertable = false, updatable = false)
-    private LocalDateTime createdAt;
 }

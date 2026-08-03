@@ -24,11 +24,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiResponse(ex.getMessage()));
     }
 
-    @ExceptionHandler(AccountNotApprovedException.class)
-    public ResponseEntity<ApiResponse> handleAccountNotApproved(AccountNotApprovedException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiResponse(ex.getMessage()));
-    }
-
     @ExceptionHandler(AccountBlockedException.class)
     public ResponseEntity<ApiResponse> handleAccountBlocked(AccountBlockedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiResponse(ex.getMessage()));
