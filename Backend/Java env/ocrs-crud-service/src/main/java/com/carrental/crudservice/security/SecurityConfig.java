@@ -38,6 +38,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/models/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/vehicles").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/vehicles/{id:[0-9]+}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/customers/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { crudApi } from '../../api/axios';
+import { bookingApi, crudApi } from '../../api/axios';
 
 // BookingResponse fields:
 //   bookingId, customerId, vehicleId, vehicleRegistrationNumber, modelName,
@@ -21,15 +21,15 @@ function Requests() {
     setLoading(true);
     setError('');
     try {
-      // 1. Get owner's vehicles — VehicleResponse: vehicleId, modelName, brandName, ...
+      // 1. Get owner's vehicles from crud-service on port 8082
       const vRes = await crudApi.get('/vehicles/my');
       const ownerVehicles = vRes.data || [];
 
-      // 2. Fetch bookings for each vehicle using vehicleId (not vehicle.id)
+      // 2. Fetch bookings for each vehicle from bookingApi on port 8083
       let allBookings = [];
       for (const vehicle of ownerVehicles) {
         try {
-          const bRes = await crudApi.get(`/bookings/vehicle/${vehicle.vehicleId}`);
+          const bRes = await bookingApi.get(`/bookings/vehicle/${vehicle.vehicleId}`);
           if (bRes.data && bRes.data.length > 0) {
             allBookings.push(...bRes.data);
           }
@@ -48,20 +48,19 @@ function Requests() {
 
   const handleUpdateStatus = async (bookingId, newStatus) => {
     try {
-      // PATCH /bookings/{id}/status with { status } body
-      await crudApi.patch(`/bookings/${bookingId}/status`, { status: newStatus });
+      // PATCH /bookings/{id}/status to ocrs-booking-service on port 8083
+      await bookingApi.patch(`/bookings/${bookingId}/status`, { status: newStatus });
       fetchOwnerRequests();
     } catch (err) {
       alert(err.response?.data?.message || `Failed to update booking status to ${newStatus}`);
     }
   };
 
-  // BookingStatus enum: Pending | Confirmed | Cancelled | Completed
   const statusStyle = (status) => {
     if (status === 'Pending')   return { bg: '#fffbeb', text: '#d97706' };
     if (status === 'Confirmed') return { bg: '#f0fdf4', text: '#16a34a' };
     if (status === 'Completed') return { bg: '#eff6ff', text: '#2563eb' };
-    return { bg: '#fef2f2', text: '#dc2626' }; // Cancelled
+    return { bg: '#fef2f2', text: '#dc2626' };
   };
 
   return (
@@ -82,9 +81,6 @@ function Requests() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {requests.map(req => {
-            // BookingResponse: bookingId, status (Pascal), modelName,
-            //                  vehicleRegistrationNumber, pickupDate, returnDate,
-            //                  bookingDate, customerId, totalAmount
             const ss = statusStyle(req.status);
             return (
               <div key={req.bookingId} style={{
@@ -95,8 +91,7 @@ function Requests() {
                 <div style={{ flex: 1, minWidth: 260 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                     <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', margin: 0 }}>
-                      {/* modelName is the vehicle name; vehicleRegistrationNumber is the RC */}
-                      {req.modelName || `Vehicle #${req.vehicleId}`}
+                      {req.brandName ? `${req.brandName} ` : ''}{req.modelName || `Vehicle #${req.vehicleId}`}
                       {req.vehicleRegistrationNumber && (
                         <span style={{ fontSize: 13, fontWeight: 400, color: '#64748b', marginLeft: 6 }}>
                           ({req.vehicleRegistrationNumber})
@@ -113,13 +108,11 @@ function Requests() {
 
                   <div style={{ fontSize: 13, color: '#64748b', display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 4 }}>
                     <span>👤 Customer ID: <strong>#{req.customerId}</strong></span>
-                    {/* pickupDate / returnDate are the correct field names */}
                     <span>📅 <strong>{req.pickupDate}</strong> → <strong>{req.returnDate}</strong></span>
                     {req.dropCity && <span>📍 Drop: {req.dropCity}</span>}
                   </div>
 
                   <div style={{ fontSize: 12, color: '#94a3b8' }}>
-                    {/* bookingId and bookingDate are the correct field names */}
                     Request ID: #{req.bookingId} | Submitted: {req.bookingDate ? new Date(req.bookingDate).toLocaleDateString() : 'N/A'}
                   </div>
                 </div>
@@ -129,17 +122,14 @@ function Requests() {
                     ₹{req.totalAmount}
                   </div>
 
-                  {/* Only show approve/reject for Pending bookings */}
                   {req.status === 'Pending' && (
                     <div style={{ display: 'flex', gap: 8 }}>
-                      {/* BookingStatus.Confirmed */}
                       <button onClick={() => handleUpdateStatus(req.bookingId, 'Confirmed')} style={{
                         padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none',
                         borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer'
                       }}>
                         ✅ Approve
                       </button>
-                      {/* BookingStatus.Cancelled */}
                       <button onClick={() => handleUpdateStatus(req.bookingId, 'Cancelled')} style={{
                         padding: '8px 16px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5',
                         borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer'

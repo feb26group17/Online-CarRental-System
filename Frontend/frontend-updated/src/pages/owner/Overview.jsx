@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { crudApi } from '../../api/axios';
+import { bookingApi, crudApi } from '../../api/axios';
 
 // VehicleResponse: vehicleId, modelName, brandName, registrationNumber, ...
-// BookingResponse: bookingId, status (Pending/Confirmed/Cancelled/Completed), ...
-// PaymentResponse: paymentId, bookingId, amt, paymentStatus (Pending/Paid/Failed/Refunded), ...
+// BookingResponse: bookingId, status (Pending/Confirmed/Cancelled/Completed), totalAmount, ...
 
 function Overview({ onNavigate }) {
   const [stats, setStats] = useState({
@@ -21,7 +20,7 @@ function Overview({ onNavigate }) {
   const fetchOverviewData = async () => {
     setLoading(true);
     try {
-      // VehicleResponse uses vehicleId (not vehicle.id)
+      // 1. Fetch owner's vehicles from crud-service on port 8082
       const vRes = await crudApi.get('/vehicles/my');
       const vehicles = vRes.data || [];
 
@@ -30,35 +29,20 @@ function Overview({ onNavigate }) {
       let pendingCount = 0;
 
       for (const car of vehicles) {
-        // Fetch payments for earnings — use vehicleId (not car.id)
         try {
-          const pRes = await crudApi.get(`/payments/vehicle/${car.vehicleId}`);
-          if (pRes.data) {
-            pRes.data.forEach(p => {
-              // PaymentStatus.Paid is the successful status (not SUCCESS or COMPLETED)
-              if (p.paymentStatus === 'Paid') {
-                // amt is the correct field name (not amount)
-                totalEarnings += parseFloat(p.amt || 0);
-              }
-            });
-          }
-        } catch (e) {
-          console.error(e);
-        }
-
-        // Fetch bookings for status counts — use vehicleId
-        try {
-          const bRes = await crudApi.get(`/bookings/vehicle/${car.vehicleId}`);
+          // 2. Fetch bookings for this vehicle from ocrs-booking-service on port 8083
+          const bRes = await bookingApi.get(`/bookings/vehicle/${car.vehicleId}`);
           if (bRes.data) {
             bRes.data.forEach(b => {
-              // BookingStatus enum: Pending | Confirmed | Cancelled | Completed
-              // Use b.status (not b.bookingStatus)
+              if (b.status === 'Confirmed' || b.status === 'Completed') {
+                totalEarnings += parseFloat(b.totalAmount || 0);
+              }
               if (b.status === 'Confirmed') activeCount++;
               if (b.status === 'Pending')   pendingCount++;
             });
           }
         } catch (e) {
-          console.error(e);
+          console.error(`Failed to fetch bookings for vehicle ${car.vehicleId}`, e);
         }
       }
 

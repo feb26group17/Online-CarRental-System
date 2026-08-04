@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { crudApi } from '../../api/axios';
+import { bookingApi, crudApi } from '../../api/axios';
 
 // BookingResponse: bookingId, customerId, vehicleId, vehicleRegistrationNumber, modelName,
 //                  bookingDate, pickupDate, returnDate, dropCity, status, totalAmount
 // BookingStatus enum: Pending | Confirmed | Cancelled | Completed
-// Active = Confirmed (not APPROVED — that status doesn't exist in backend)
+// Active = Confirmed
 
 function ActiveRentals() {
   const [rentals, setRentals] = useState([]);
@@ -22,21 +22,21 @@ function ActiveRentals() {
     setLoading(true);
     setError('');
     try {
-      // VehicleResponse: vehicleId (not vehicle.id)
+      // 1. Get owner's vehicles from crud-service on port 8082
       const vRes = await crudApi.get('/vehicles/my');
       const ownerVehicles = vRes.data || [];
 
       let activeBookings = [];
       for (const vehicle of ownerVehicles) {
         try {
-          const bRes = await crudApi.get(`/bookings/vehicle/${vehicle.vehicleId}`);
+          // 2. Fetch bookings for vehicle from ocrs-booking-service on port 8083
+          const bRes = await bookingApi.get(`/bookings/vehicle/${vehicle.vehicleId}`);
           if (bRes.data) {
-            // Active = Confirmed (BookingStatus.Confirmed)
             const active = bRes.data.filter(b => b.status === 'Confirmed');
             activeBookings.push(...active);
           }
         } catch (e) {
-          console.error(e);
+          console.error(`Failed to load active rentals for vehicle ${vehicle.vehicleId}`, e);
         }
       }
       setRentals(activeBookings);
@@ -66,21 +66,19 @@ function ActiveRentals() {
         <div key={r.bookingId} style={{
           background: '#fff', border: '1px solid #e2e8f0',
           borderRadius: 12, padding: '20px 22px', marginBottom: 14,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
         }}>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
             <div>
-              {/* modelName is the vehicle name in BookingResponse */}
               <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
-                🚗 {r.modelName || `Vehicle #${r.vehicleId}`}
+                🚗 {r.brandName ? `${r.brandName} ` : ''}{r.modelName || `Vehicle #${r.vehicleId}`}
               </div>
               {r.vehicleRegistrationNumber && (
                 <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
                   RC: {r.vehicleRegistrationNumber}
                 </div>
               )}
-              {/* bookingId is the correct id field */}
               <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>Booking ID: #{r.bookingId}</div>
             </div>
             <span style={{
@@ -93,9 +91,7 @@ function ActiveRentals() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, marginBottom: 16 }}>
             {[
-              // customerId since customerName is not in BookingResponse
               { label: 'Customer ID', value: `#${r.customerId}` },
-              // pickupDate / returnDate are the correct field names
               { label: 'Pickup Date', value: r.pickupDate },
               { label: 'Return Date', value: r.returnDate },
               { label: 'Total Amount', value: `₹${r.totalAmount}`, green: true },

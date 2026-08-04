@@ -11,6 +11,11 @@ export const crudApi = axios.create({
   baseURL: 'http://localhost:8082/api'
 });
 
+// Base URL of ocrs-booking-service (Spring Boot Booking & Payment service on port 8083)
+export const bookingApi = axios.create({
+  baseURL: 'http://localhost:8083/api'
+});
+
 const attachAuthToken = (config) => {
   try {
     const state = store.getState();
@@ -26,6 +31,7 @@ const attachAuthToken = (config) => {
 
 authApi.interceptors.request.use(attachAuthToken, (error) => Promise.reject(error));
 crudApi.interceptors.request.use(attachAuthToken, (error) => Promise.reject(error));
+bookingApi.interceptors.request.use(attachAuthToken, (error) => Promise.reject(error));
 
 // Export authApi as default for backward compatibility with login/register pages
 export default authApi;

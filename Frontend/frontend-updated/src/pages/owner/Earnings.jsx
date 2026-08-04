@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { crudApi } from '../../api/axios';
+import { bookingApi, crudApi } from '../../api/axios';
 
-// PaymentResponse: paymentId, bookingId, amt, paymentMethod, paymentStatus, paymentDate
-// PaymentStatus enum: Pending | Paid | Failed | Refunded
-// VehicleResponse: vehicleId, modelName, brandName, ...
+// BookingResponse: bookingId, vehicleId, status (Pending/Confirmed/Cancelled/Completed), totalAmount, ...
+// VehicleResponse: vehicleId, modelName, brandName, registrationNumber, ...
 
 function Earnings() {
   const [vehicleEarnings, setVehicleEarnings] = useState([]);
@@ -19,7 +18,7 @@ function Earnings() {
     setLoading(true);
     setError('');
     try {
-      // VehicleResponse uses vehicleId (not car.id)
+      // 1. Get owner's vehicles from crud-service on port 8082
       const vRes = await crudApi.get('/vehicles/my');
       const vehicles = vRes.data || [];
 
@@ -30,28 +29,27 @@ function Earnings() {
         let trips = 0;
 
         try {
-          // Use vehicleId (not car.id)
-          const pRes = await crudApi.get(`/payments/vehicle/${car.vehicleId}`);
-          if (pRes.data) {
-            pRes.data.forEach(p => {
-              trips++;
-              // amt is the correct field name (not amount)
-              const amt = parseFloat(p.amt || 0);
-              revenue += amt;
-              // PaymentStatus.Paid is the successful status (not SUCCESS or COMPLETED)
-              if (p.paymentStatus === 'Paid') {
-                paid += amt;
+          // 2. Fetch bookings for vehicle from ocrs-booking-service on port 8083
+          const bRes = await bookingApi.get(`/bookings/vehicle/${car.vehicleId}`);
+          if (bRes.data) {
+            bRes.data.forEach(b => {
+              if (b.status !== 'Cancelled') {
+                trips++;
+                const amt = parseFloat(b.totalAmount || 0);
+                revenue += amt;
+                if (b.status === 'Confirmed' || b.status === 'Completed') {
+                  paid += amt;
+                }
               }
             });
           }
         } catch (e) {
-          console.error(e);
+          console.error(`Failed to fetch bookings for vehicle ${car.vehicleId}`, e);
         }
 
         breakdown.push({
           id: car.vehicleId,
-          // modelName + brandName from VehicleResponse
-          car: car.modelName ? `${car.brandName} ${car.modelName}` : car.registrationNumber,
+          car: car.brandName ? `${car.brandName} ${car.modelName}` : car.modelName || car.registrationNumber,
           trips,
           revenue,
           paid,

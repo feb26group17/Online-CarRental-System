@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../redux/slices/authSlice';
-import { crudApi } from '../api/axios';
+import { bookingApi, crudApi } from '../api/axios';
 
 // UserResponse:    id, name, email, phone, role, status (ACTIVE|BLOCKED), address, adharCard, createdAt
 // BookingResponse: bookingId, customerId, vehicleId, vehicleRegistrationNumber, modelName,
@@ -53,7 +53,8 @@ function AdminDashboard() {
     setLoading(true);
     setError('');
     try {
-      const res = await crudApi.get('/bookings');
+      // Fetch system bookings from ocrs-booking-service on port 8083
+      const res = await bookingApi.get('/bookings');
       setBookingsList(res.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch system bookings');
@@ -66,7 +67,8 @@ function AdminDashboard() {
     setLoading(true);
     setError('');
     try {
-      const res = await crudApi.get('/payments');
+      // Fetch payments from ocrs-booking-service on port 8083
+      const res = await bookingApi.get('/payments');
       setPaymentsList(res.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch payments');
@@ -79,7 +81,8 @@ function AdminDashboard() {
     setLoading(true);
     setError('');
     try {
-      const res = await crudApi.get('/refunds');
+      // Fetch refunds from ocrs-booking-service on port 8083
+      const res = await bookingApi.get('/refunds');
       setRefundsList(res.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch refunds');
@@ -89,7 +92,7 @@ function AdminDashboard() {
   };
 
   const toggleUserStatus = async (targetUser) => {
-    // UserStatus enum: ACTIVE | BLOCKED  (not INACTIVE)
+    // UserStatus enum: ACTIVE | BLOCKED
     const newStatus = targetUser.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE';
     try {
       await crudApi.patch(`/users/${targetUser.id}/status`, { status: newStatus });
@@ -194,7 +197,6 @@ function AdminDashboard() {
                         {usersList.map((u, idx) => (
                           <tr key={u.id} style={{ borderBottom: idx < usersList.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
                             <td style={{ padding: '14px 18px', fontWeight: 600, color: '#1e293b' }}>#{u.id}</td>
-                            {/* UserResponse uses 'name' (not 'fullName') */}
                             <td style={{ padding: '14px 18px', fontWeight: 600 }}>{u.name}</td>
                             <td style={{ padding: '14px 18px', color: '#64748b' }}>{u.email}</td>
                             <td style={{ padding: '14px 18px', color: '#64748b' }}>{u.phone || 'N/A'}</td>
@@ -206,7 +208,6 @@ function AdminDashboard() {
                               </span>
                             </td>
                             <td style={{ padding: '14px 18px' }}>
-                              {/* UserStatus: ACTIVE | BLOCKED */}
                               <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
                                 background: u.status === 'ACTIVE' ? '#f0fdf4' : '#fef2f2',
                                 color: u.status === 'ACTIVE' ? '#16a34a' : '#dc2626' }}>
@@ -221,7 +222,6 @@ function AdminDashboard() {
                                   color: u.status === 'ACTIVE' ? '#dc2626' : '#16a34a',
                                   border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer'
                                 }}>
-                                  {/* Correct toggle: ACTIVE → BLOCKED (not INACTIVE) */}
                                   {u.status === 'ACTIVE' ? 'Block' : 'Activate'}
                                 </button>
                               )}
@@ -259,22 +259,16 @@ function AdminDashboard() {
                       </thead>
                       <tbody>
                         {bookingsList.map((b, idx) => {
-                          // BookingResponse: bookingId, customerId, modelName,
-                          //   vehicleRegistrationNumber, pickupDate, returnDate, status, totalAmount
                           const ss = bookingStatusStyle(b.status);
                           return (
                             <tr key={b.bookingId} style={{ borderBottom: idx < bookingsList.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
                               <td style={{ padding: '14px 18px', fontWeight: 600, color: '#1e293b' }}>#{b.bookingId}</td>
                               <td style={{ padding: '14px 18px', color: '#64748b' }}>#{b.customerId}</td>
-                              {/* modelName is the vehicle name in BookingResponse */}
-                              <td style={{ padding: '14px 18px', fontWeight: 600 }}>{b.modelName || `Vehicle #${b.vehicleId}`}</td>
-                              {/* vehicleRegistrationNumber is the RC field */}
+                              <td style={{ padding: '14px 18px', fontWeight: 600 }}>{b.brandName ? `${b.brandName} ` : ''}{b.modelName || `Vehicle #${b.vehicleId}`}</td>
                               <td style={{ padding: '14px 18px', color: '#64748b' }}>{b.vehicleRegistrationNumber || 'N/A'}</td>
-                              {/* pickupDate / returnDate are the correct field names */}
                               <td style={{ padding: '14px 18px', color: '#64748b', fontSize: 13 }}>{b.pickupDate} → {b.returnDate}</td>
                               <td style={{ padding: '14px 18px', fontWeight: 700, color: '#2563eb' }}>₹{b.totalAmount}</td>
                               <td style={{ padding: '14px 18px' }}>
-                                {/* status is Pascal case: Pending|Confirmed|Cancelled|Completed */}
                                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: ss.bg, color: ss.text }}>
                                   {b.status}
                                 </span>
@@ -312,22 +306,17 @@ function AdminDashboard() {
                       </thead>
                       <tbody>
                         {paymentsList.map((p, idx) => {
-                          // PaymentResponse: paymentId, bookingId, amt, paymentMethod, paymentStatus, paymentDate
                           const ss = paymentStatusStyle(p.paymentStatus);
                           return (
                             <tr key={p.paymentId} style={{ borderBottom: idx < paymentsList.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                              {/* paymentId is the correct id field */}
                               <td style={{ padding: '14px 18px', fontWeight: 600, color: '#1e293b' }}>#{p.paymentId}</td>
                               <td style={{ padding: '14px 18px', color: '#64748b' }}>#{p.bookingId}</td>
-                              {/* paymentMethod is the @JsonValue display string: "Credit Card", "UPI", etc. */}
                               <td style={{ padding: '14px 18px' }}>{p.paymentMethod || 'N/A'}</td>
-                              {/* amt is the correct field name (not amount) */}
                               <td style={{ padding: '14px 18px', fontWeight: 700, color: '#16a34a' }}>₹{p.amt}</td>
                               <td style={{ padding: '14px 18px', color: '#64748b' }}>
                                 {p.paymentDate ? new Date(p.paymentDate).toLocaleDateString() : 'N/A'}
                               </td>
                               <td style={{ padding: '14px 18px' }}>
-                                {/* PaymentStatus: Pending|Paid|Failed|Refunded */}
                                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: ss.bg, color: ss.text }}>
                                   {p.paymentStatus || 'Pending'}
                                 </span>
@@ -371,19 +360,14 @@ function AdminDashboard() {
                       </thead>
                       <tbody>
                         {refundsList.map((r, idx) => {
-                          // RefundResponse: refundId, paymentId, refAmount, reason, status, refundDate
                           const ss = refundStatusStyle(r.status);
                           return (
                             <tr key={r.refundId} style={{ borderBottom: idx < refundsList.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                              {/* refundId is the correct id field */}
                               <td style={{ padding: '14px 18px', fontWeight: 600, color: '#1e293b' }}>#{r.refundId}</td>
                               <td style={{ padding: '14px 18px', color: '#64748b' }}>#{r.paymentId}</td>
-                              {/* refAmount is the correct field (not refundAmount) */}
                               <td style={{ padding: '14px 18px', fontWeight: 700, color: '#dc2626' }}>₹{r.refAmount}</td>
                               <td style={{ padding: '14px 18px', color: '#475569' }}>{r.reason || 'N/A'}</td>
                               <td style={{ padding: '14px 18px' }}>
-                                {/* RefundStatus: Pending|Approved|Rejected|Completed */}
-                                {/* r.status is the correct field (not r.refundStatus) */}
                                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: ss.bg, color: ss.text }}>
                                   {r.status || 'Pending'}
                                 </span>

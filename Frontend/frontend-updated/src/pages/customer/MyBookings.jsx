@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { crudApi } from '../../api/axios';
+import { bookingApi } from '../../api/axios';
 
 // BookingStatus enum (Pascal case): Pending | Confirmed | Cancelled | Completed
 // PaymentMethod display strings (from @JsonValue): UPI | Credit Card | Debit Card | Net Banking | Cash
@@ -10,14 +10,7 @@ const statusColors = {
   Cancelled: { bg: '#fef2f2', text: '#dc2626' },
 };
 
-// BookingResponse fields:
-//   bookingId, customerId, vehicleId, vehicleRegistrationNumber, modelName,
-//   bookingDate, pickupDate, returnDate, dropCity, status, totalAmount
-
 function PaymentModal({ booking, onClose, onSuccess }) {
-  // PaymentMethod enum values serialized via @JsonValue:
-  // UPI -> "UPI", CREDIT_CARD -> "Credit Card", DEBIT_CARD -> "Debit Card",
-  // NET_BANKING -> "Net Banking", CASH -> "Cash"
   const [method, setMethod] = useState('UPI');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -26,9 +19,8 @@ function PaymentModal({ booking, onClose, onSuccess }) {
     setLoading(true);
     setError('');
     try {
-      // PaymentRequest: { bookingId, paymentMethod }
-      // bookingId comes from booking.bookingId (not booking.id)
-      await crudApi.post('/payments', {
+      // PaymentRequest to ocrs-booking-service: { bookingId, paymentMethod }
+      await bookingApi.post('/payments', {
         bookingId: booking.bookingId,
         paymentMethod: method
       });
@@ -63,7 +55,6 @@ function PaymentModal({ booking, onClose, onSuccess }) {
           <label>Select Payment Method</label>
           <select value={method} onChange={e => setMethod(e.target.value)}
             style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}>
-            {/* These are the @JsonValue display strings the backend expects */}
             <option value="Credit Card">Credit Card</option>
             <option value="Debit Card">Debit Card</option>
             <option value="UPI">UPI / GPay / PhonePe</option>
@@ -100,7 +91,8 @@ function MyBookings() {
     setLoading(true);
     setError('');
     try {
-      const res = await crudApi.get('/bookings/my');
+      // Fetch bookings from ocrs-booking-service on port 8083
+      const res = await bookingApi.get('/bookings/my');
       setBookings(res.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch your bookings');
@@ -112,8 +104,7 @@ function MyBookings() {
   const handleCancel = async (bookingId) => {
     if (!window.confirm('Are you sure you want to cancel this booking?')) return;
     try {
-      // Correct endpoint: /bookings/{id}/cancel
-      await crudApi.patch(`/bookings/${bookingId}/cancel`);
+      await bookingApi.patch(`/bookings/${bookingId}/cancel`);
       fetchBookings();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to cancel booking');
@@ -138,12 +129,8 @@ function MyBookings() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {bookings.map(b => {
-            // BookingResponse fields: bookingId, status (Pascal case), modelName,
-            //                         pickupDate, returnDate, bookingDate, totalAmount
             const st = statusColors[b.status] || { bg: '#f1f5f9', text: '#475569' };
-            // Can cancel only when Pending or Confirmed
-            const canCancel = b.status === 'Pending' || b.status === 'Confirmed';
-            // Can pay when Pending or Confirmed
+            const canCancel = b.status === 'Pending';
             const canPay = b.status === 'Pending' || b.status === 'Confirmed';
 
             return (
@@ -155,8 +142,7 @@ function MyBookings() {
                 <div style={{ flex: 1, minWidth: 240 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                     <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', margin: 0 }}>
-                      {/* modelName is the vehicle name in BookingResponse */}
-                      {b.modelName || `Vehicle #${b.vehicleId}`}
+                      {b.brandName ? `${b.brandName} ` : ''}{b.modelName || `Vehicle #${b.vehicleId}`}
                     </h3>
                     <span style={{
                       fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
@@ -167,14 +153,12 @@ function MyBookings() {
                   </div>
 
                   <div style={{ fontSize: 13, color: '#64748b', display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 4 }}>
-                    {/* pickupDate / returnDate are the correct field names */}
                     <span>📅 <strong>{b.pickupDate}</strong> → <strong>{b.returnDate}</strong></span>
                     {b.dropCity && <span>📍 Drop: {b.dropCity}</span>}
                     {b.vehicleRegistrationNumber && <span>🔖 {b.vehicleRegistrationNumber}</span>}
                   </div>
 
                   <div style={{ fontSize: 12, color: '#94a3b8' }}>
-                    {/* bookingId and bookingDate are the correct field names */}
                     Booking ID: #{b.bookingId} | Booked on: {b.bookingDate ? new Date(b.bookingDate).toLocaleDateString() : 'N/A'}
                   </div>
                 </div>
@@ -185,7 +169,7 @@ function MyBookings() {
                   </div>
 
                   <div style={{ display: 'flex', gap: 8 }}>
-                    {canPay && (
+                    {canPay && b.status !== 'Confirmed' && (
                       <button className="btn-primary" style={{ width: 'auto', padding: '6px 14px', fontSize: 12, marginTop: 0 }}
                         onClick={() => setSelectedBookingForPay(b)}>
                         💳 Pay Now

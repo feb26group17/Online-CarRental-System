@@ -3,7 +3,6 @@ import { crudApi } from '../../api/axios';
 
 // VehicleRequest (POST /api/vehicles):
 //   { modelId*, registrationNumber*, fuelType*, rentPerDay*, status }
-//   NOTE: brandId, color, description, imageUrl are NOT accepted by backend
 //
 // FuelType enum: Diesel | Petrol | CNG | Battery
 // VehicleStatus enum: Available | Booked | Maintenance
@@ -17,19 +16,21 @@ const FUEL_TYPES = ['Diesel', 'Petrol', 'CNG', 'Battery'];
 
 function AddVehicleModal({ onClose, onAddSuccess }) {
   const [brands, setBrands] = useState([]);
+  const [allModels, setAllModels] = useState([]);
   const [models, setModels] = useState([]);
   const [form, setForm] = useState({
     brandId: '',
     modelId: '',
-    registrationNumber: '',  // correct field name
-    fuelType: '',            // required by backend
-    rentPerDay: '',          // correct field name
+    registrationNumber: '',
+    fuelType: '',
+    rentPerDay: '',
   });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
 
   useEffect(() => {
     fetchBrands();
+    fetchAllModels();
   }, []);
 
   const fetchBrands = async () => {
@@ -41,6 +42,16 @@ function AddVehicleModal({ onClose, onAddSuccess }) {
     }
   };
 
+  const fetchAllModels = async () => {
+    try {
+      const res = await crudApi.get('/models');
+      setAllModels(res.data || []);
+      setModels(res.data || []);
+    } catch (e) {
+      console.error('Failed to load models', e);
+    }
+  };
+
   const handleBrandChange = async (brandId) => {
     setForm(f => ({ ...f, brandId, modelId: '' }));
     if (brandId) {
@@ -48,11 +59,20 @@ function AddVehicleModal({ onClose, onAddSuccess }) {
         const res = await crudApi.get(`/models?brandId=${brandId}`);
         setModels(res.data || []);
       } catch (e) {
-        console.error('Failed to load models', e);
+        console.error('Failed to load models for brand', e);
       }
     } else {
-      setModels([]);
+      setModels(allModels);
     }
+  };
+
+  const handleModelChange = (modelId) => {
+    const selected = allModels.find(m => String(m.modelId) === String(modelId));
+    setForm(f => ({
+      ...f,
+      modelId,
+      brandId: selected ? String(selected.brandId) : f.brandId
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -64,13 +84,12 @@ function AddVehicleModal({ onClose, onAddSuccess }) {
     setLoading(true);
     setErr('');
     try {
-      // VehicleRequest: modelId, registrationNumber, fuelType, rentPerDay, status
       await crudApi.post('/vehicles', {
         modelId: parseInt(form.modelId),
         registrationNumber: form.registrationNumber,
-        fuelType: form.fuelType,                         // must match FuelType enum exactly
+        fuelType: form.fuelType,
         rentPerDay: parseFloat(form.rentPerDay),
-        status: 'Available'                              // VehicleStatus.Available
+        status: 'Available'
       });
       onAddSuccess();
       onClose();
@@ -96,34 +115,34 @@ function AddVehicleModal({ onClose, onAddSuccess }) {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Car Brand *</label>
-            {/* BrandResponse: brandId, bname */}
-            <select value={form.brandId} onChange={e => handleBrandChange(e.target.value)} required
+            <label>Car Brand (Optional Filter)</label>
+            <select value={form.brandId} onChange={e => handleBrandChange(e.target.value)}
               style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14 }}>
-              <option value="">Select Brand</option>
+              <option value="">All Brands</option>
               {brands.map(b => <option key={b.brandId} value={b.brandId}>{b.bname}</option>)}
             </select>
           </div>
 
           <div className="form-group">
             <label>Car Model *</label>
-            {/* ModelResponse: modelId, modelName, seatingCapacity */}
-            <select value={form.modelId} onChange={e => setForm({ ...form, modelId: e.target.value })} required disabled={!form.brandId}
-              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, opacity: !form.brandId ? 0.6 : 1 }}>
-              <option value="">Select Model</option>
-              {models.map(m => <option key={m.modelId} value={m.modelId}>{m.modelName} ({m.seatingCapacity} seats)</option>)}
+            <select value={form.modelId} onChange={e => handleModelChange(e.target.value)} required
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14 }}>
+              <option value="">Select Car Model</option>
+              {models.map(m => (
+                <option key={m.modelId} value={m.modelId}>
+                  {m.brandName ? `${m.brandName} ` : ''}{m.modelName} ({m.seatingCapacity} seats)
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="form-group">
-            {/* registrationNumber is the correct field name (not vehicleNumber) */}
             <label>Registration Number *</label>
             <input type="text" placeholder="e.g. MH12AB1234" value={form.registrationNumber}
               onChange={e => setForm({ ...form, registrationNumber: e.target.value })} required />
           </div>
 
           <div className="form-group">
-            {/* fuelType is required — FuelType enum: Diesel | Petrol | CNG | Battery */}
             <label>Fuel Type *</label>
             <select value={form.fuelType} onChange={e => setForm({ ...form, fuelType: e.target.value })} required
               style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14 }}>
@@ -133,7 +152,6 @@ function AddVehicleModal({ onClose, onAddSuccess }) {
           </div>
 
           <div className="form-group">
-            {/* rentPerDay is the correct field name (not rentalPricePerDay) */}
             <label>Daily Rental Rate (₹) *</label>
             <input type="number" step="0.01" placeholder="e.g. 1500" value={form.rentPerDay}
               onChange={e => setForm({ ...form, rentPerDay: e.target.value })} required />
@@ -183,10 +201,8 @@ function MyVehicles() {
   };
 
   const toggleStatus = async (car) => {
-    // VehicleStatus enum: Available | Booked | Maintenance
     const newStatus = car.status === 'Available' ? 'Maintenance' : 'Available';
     try {
-      // vehicleId is the correct id field
       await crudApi.patch(`/vehicles/${car.vehicleId}/status`, { status: newStatus });
       fetchMyVehicles();
     } catch (err) {
@@ -204,11 +220,10 @@ function MyVehicles() {
     }
   };
 
-  // VehicleStatus: Available | Booked | Maintenance
   const statusStyle = (status) => {
     if (status === 'Available')   return { bg: '#f0fdf4', text: '#16a34a' };
     if (status === 'Booked')      return { bg: '#eff6ff', text: '#2563eb' };
-    return { bg: '#fff7ed', text: '#ea580c' }; // Maintenance
+    return { bg: '#fff7ed', text: '#ea580c' };
   };
 
   return (
@@ -237,8 +252,6 @@ function MyVehicles() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {vehicles.map(car => {
-            // VehicleResponse: vehicleId, modelId, modelName, brandName,
-            //                  seatingCapacity, registrationNumber, fuelType, rentPerDay, status
             const ss = statusStyle(car.status);
             return (
               <div key={car.vehicleId} style={{
@@ -268,17 +281,14 @@ function MyVehicles() {
                   <div style={{ fontSize: 12, color: '#64748b', display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
                     <span>⛽ {car.fuelType || 'N/A'}</span>
                     <span>🪑 {car.seatingCapacity || 5} seats</span>
-                    {/* registrationNumber is the correct field */}
                     <span>🔖 {car.registrationNumber}</span>
                   </div>
 
                   <div style={{ fontSize: 17, fontWeight: 800, color: '#2563eb', marginBottom: 14 }}>
-                    {/* rentPerDay is the correct field */}
                     ₹{car.rentPerDay}<span style={{ fontSize: 12, fontWeight: 400, color: '#94a3b8' }}>/day</span>
                   </div>
 
                   <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
-                    {/* Only allow toggling if not Booked (can't un-book manually) */}
                     <button onClick={() => toggleStatus(car)} disabled={car.status === 'Booked'} style={{
                       flex: 1, padding: '7px', fontSize: 12, fontWeight: 600, cursor: car.status === 'Booked' ? 'not-allowed' : 'pointer',
                       border: '1px solid #e2e8f0', borderRadius: 7,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { crudApi } from '../../api/axios';
+import { bookingApi } from '../../api/axios';
 
 // BookingRequest: { vehicleId, pickupDate, returnDate, dropCity }
 // VehicleResponse: { vehicleId, userId, modelId, modelName, brandName,
@@ -26,18 +26,18 @@ function CarDetail({ car, onBookSuccess }) {
     );
   }
 
-  // Calculate rental duration in days
+  // Calculate rental duration in days (same-day rental counts as minimum 1 day)
   const calculateDays = () => {
     if (!pickupDate || !returnDate) return 0;
     const start = new Date(pickupDate);
     const end = new Date(returnDate);
+    if (end < start) return 0; // invalid range
     const diffTime = end - start;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
+    return diffDays > 0 ? diffDays : 1; // Same-day rental = 1 day minimum
   };
 
   const days = calculateDays();
-  // rentPerDay is the correct field from VehicleResponse (not rentalPricePerDay)
   const totalAmount = days * (car.rentPerDay || 0);
 
   const handleBooking = async (e) => {
@@ -45,17 +45,21 @@ function CarDetail({ car, onBookSuccess }) {
     setError('');
     setSuccessMsg('');
 
-    if (days <= 0) {
-      return setError('Return date must be after pickup date');
+    if (!pickupDate || !returnDate) {
+      return setError('Please select both Pickup Date and Return Date');
+    }
+
+    if (new Date(returnDate) < new Date(pickupDate)) {
+      return setError('Return date cannot be before pickup date');
     }
 
     setLoading(true);
     try {
-      // BookingRequest expects: vehicleId, pickupDate, returnDate, dropCity
-      await crudApi.post('/bookings', {
-        vehicleId: car.vehicleId,   // vehicleId (not car.id)
-        pickupDate: pickupDate,     // pickupDate (not startDate)
-        returnDate: returnDate,     // returnDate (not endDate)
+      // Send booking request to ocrs-booking-service on port 8083
+      await bookingApi.post('/bookings', {
+        vehicleId: car.vehicleId,
+        pickupDate: pickupDate,
+        returnDate: returnDate,
         dropCity: dropCity || null
       });
 
@@ -72,7 +76,6 @@ function CarDetail({ car, onBookSuccess }) {
 
   return (
     <div className="page-container">
-      {/* brandName + modelName from VehicleResponse */}
       <h2 className="page-heading">{car.brandName} {car.modelName || car.registrationNumber}</h2>
       <p className="page-sub">View specifications and complete your reservation</p>
 
@@ -99,12 +102,10 @@ function CarDetail({ car, onBookSuccess }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
             <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8 }}>
-              {/* registrationNumber is the correct field (not vehicleNumber) */}
               <div style={{ fontSize: 11, color: '#64748b' }}>Registration No.</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{car.registrationNumber || 'N/A'}</div>
             </div>
             <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8 }}>
-              {/* fuelType: Diesel | Petrol | CNG | Battery */}
               <div style={{ fontSize: 11, color: '#64748b' }}>Fuel Type</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{car.fuelType || 'N/A'}</div>
             </div>
@@ -113,7 +114,6 @@ function CarDetail({ car, onBookSuccess }) {
               <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{car.seatingCapacity || 5} Persons</div>
             </div>
             <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8 }}>
-              {/* status: Available | Booked | Maintenance */}
               <div style={{ fontSize: 11, color: '#64748b' }}>Status</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: car.status === 'Available' ? '#16a34a' : '#dc2626' }}>
                 {car.status}
@@ -124,7 +124,6 @@ function CarDetail({ car, onBookSuccess }) {
           <div style={{ background: '#eff6ff', padding: '14px 16px', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: 12, color: '#2563eb', fontWeight: 600 }}>Daily Rate</div>
-              {/* rentPerDay is the correct field */}
               <div style={{ fontSize: 22, fontWeight: 800, color: '#1e293b' }}>₹{car.rentPerDay}</div>
             </div>
             <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20, background: '#dbeafe', color: '#1e40af' }}>
@@ -146,14 +145,12 @@ function CarDetail({ car, onBookSuccess }) {
 
           <form onSubmit={handleBooking}>
             <div className="form-group">
-              {/* pickupDate is the correct field name for BookingRequest */}
               <label>Pickup Date *</label>
               <input type="date" value={pickupDate} min={new Date().toISOString().split('T')[0]}
                 onChange={e => setPickupDate(e.target.value)} required disabled={car.status !== 'Available'} />
             </div>
 
             <div className="form-group">
-              {/* returnDate is the correct field name for BookingRequest */}
               <label>Return Date *</label>
               <input type="date" value={returnDate} min={pickupDate || new Date().toISOString().split('T')[0]}
                 onChange={e => setReturnDate(e.target.value)} required disabled={car.status !== 'Available'} />
@@ -161,7 +158,7 @@ function CarDetail({ car, onBookSuccess }) {
 
             <div className="form-group">
               <label>Drop City (Optional)</label>
-              <input type="text" placeholder="e.g. Mumbai" value={dropCity}
+              <input type="text" placeholder="e.g. Pune" value={dropCity}
                 onChange={e => setDropCity(e.target.value)} disabled={car.status !== 'Available'} />
             </div>
 

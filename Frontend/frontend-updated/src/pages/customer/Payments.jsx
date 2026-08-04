@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { crudApi } from '../../api/axios';
+import { bookingApi } from '../../api/axios';
 
-// PaymentResponse fields: paymentId, bookingId, amt, paymentMethod, paymentStatus, paymentDate
+// PaymentResponse fields: paymentId, bookingId, amt, paymentMethod, paymentStatus, paymentDate, bookingDetails
 // PaymentStatus enum: Pending | Paid | Failed | Refunded
-// RefundRequest fields: { paymentId, reason }  (NO refundAmount — backend determines it)
 
 function RefundModal({ payment, onClose, onSuccess }) {
   const [reason, setReason] = useState('');
@@ -16,9 +15,9 @@ function RefundModal({ payment, onClose, onSuccess }) {
     setError('');
 
     try {
-      // RefundRequest only has paymentId + reason (no refundAmount field in backend)
-      await crudApi.post('/refunds', {
-        paymentId: payment.paymentId,  // paymentId (not payment.id)
+      // Send refund request to ocrs-booking-service on port 8083
+      await bookingApi.post('/refunds', {
+        paymentId: payment.paymentId,
         reason: reason
       });
       onSuccess();
@@ -38,7 +37,6 @@ function RefundModal({ payment, onClose, onSuccess }) {
       <div style={{ background: '#fff', borderRadius: 14, padding: 24, maxWidth: 420, width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
         <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>Request Refund</h3>
         <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
-          {/* amt is the correct field (not amount) */}
           Payment #{payment.paymentId} — Paid Amount: ₹{payment.amt}
         </p>
 
@@ -63,7 +61,7 @@ function RefundModal({ payment, onClose, onSuccess }) {
             </button>
             <button type="button" onClick={onClose} style={{
               flex: 1, padding: '12px', background: '#f1f5f9', border: 'none', borderRadius: 8,
-              fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#475569'
+              fontSize: 14, fontWeight: 600, cursor: 'cursor', color: '#475569'
             }}>Cancel</button>
           </div>
         </form>
@@ -87,7 +85,8 @@ function Payments() {
     setLoading(true);
     setError('');
     try {
-      const res = await crudApi.get('/payments/my');
+      // Fetch payment history from ocrs-booking-service on port 8083
+      const res = await bookingApi.get('/payments/my');
       setPayments(res.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load payment history');
@@ -102,12 +101,11 @@ function Payments() {
     setTimeout(() => setSuccessMsg(''), 4000);
   };
 
-  // PaymentStatus enum: Pending | Paid | Failed | Refunded
   const statusStyle = (status) => {
     if (status === 'Paid')     return { bg: '#f0fdf4', color: '#16a34a' };
     if (status === 'Refunded') return { bg: '#eff6ff', color: '#2563eb' };
     if (status === 'Failed')   return { bg: '#fef2f2', color: '#dc2626' };
-    return { bg: '#fffbeb', color: '#d97706' }; // Pending
+    return { bg: '#fffbeb', color: '#d97706' };
   };
 
   return (
@@ -145,21 +143,18 @@ function Payments() {
             </thead>
             <tbody>
               {payments.map((p, idx) => {
-                // PaymentResponse: paymentId, bookingId, amt, paymentMethod, paymentStatus, paymentDate
                 const ss = statusStyle(p.paymentStatus);
                 return (
                   <tr key={p.paymentId} style={{ borderBottom: idx < payments.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
                     <td style={{ padding: '14px 18px', fontWeight: 600, color: '#1e293b' }}>#{p.paymentId}</td>
                     <td style={{ padding: '14px 18px', color: '#64748b' }}>#{p.bookingId}</td>
                     <td style={{ padding: '14px 18px', color: '#475569' }}>
-                      {/* paymentMethod is the @JsonValue display string e.g. "Credit Card" */}
                       {p.paymentMethod || 'N/A'}
                     </td>
                     <td style={{ padding: '14px 18px', color: '#64748b' }}>
                       {p.paymentDate ? new Date(p.paymentDate).toLocaleDateString() : 'N/A'}
                     </td>
                     <td style={{ padding: '14px 18px', fontWeight: 700, color: '#16a34a' }}>
-                      {/* amt is the correct field name (not amount) */}
                       ₹{p.amt}
                     </td>
                     <td style={{ padding: '14px 18px' }}>
@@ -171,7 +166,6 @@ function Payments() {
                       </span>
                     </td>
                     <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                      {/* Only allow refund request if payment is Paid and not already Refunded */}
                       {p.paymentStatus === 'Paid' && (
                         <button onClick={() => setSelectedPaymentForRefund(p)} style={{
                           padding: '6px 12px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe',
