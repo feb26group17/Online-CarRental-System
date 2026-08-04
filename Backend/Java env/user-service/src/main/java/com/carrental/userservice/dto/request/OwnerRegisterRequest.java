@@ -21,8 +21,7 @@ public class OwnerRegisterRequest {
 
     private String address;
 
-    @NotBlank(message = "Driving license is required for car owners")
-    private String drivingLicense;
+    private String adharCard;
 
     @NotBlank(message = "Password is required")
     @Size(min = 6, message = "Password must be at least 6 characters")

@@ -16,7 +16,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class AuthResponse {
     private String token;
-    private Integer id;       // role-scoped id: customer_id / owner_id / users.id for admin
+    private Integer id;       // role-scoped id: customer_id for customers; users.id for owners/admin
     private Integer userId;   // users.id — the master identity id, always present
     private String fullName;
     private String email;

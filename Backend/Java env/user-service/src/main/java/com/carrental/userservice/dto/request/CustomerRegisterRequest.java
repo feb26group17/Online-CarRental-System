@@ -23,6 +23,8 @@ public class CustomerRegisterRequest {
 
     private String drivingLicense;
 
+    private String adharCard;
+
     @NotBlank(message = "Password is required")
     @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;

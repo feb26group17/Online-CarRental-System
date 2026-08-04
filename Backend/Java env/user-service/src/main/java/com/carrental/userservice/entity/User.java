@@ -25,8 +25,10 @@ import java.time.LocalDateTime;
  * here for every role, including admin (there is no separate admin table
  * anymore; the seeded admin is just a row in this table with role='admin').
  *
- * `customer` and `car_owner` are now thin profile-extension tables linked
- * back here via their own `user_id` column.
+ * `customer` is now a thin profile-extension table linked back here via
+ * its own `user_id` column. There is no separate owner profile table —
+ * an owner is simply a `users` row with role='owner'; `address` and
+ * `adhar_card` live directly on `users` for every role.
  */
 @Entity
 @Table(name = "users")
@@ -58,10 +60,16 @@ public class User {
     @Column(nullable = false, columnDefinition = "ENUM('customer','owner','admin')")
     private Role role;
 
+    @Column(columnDefinition = "TEXT")
+    private String address;
+
     @Convert(converter = UserStatusConverter.class)
-    @Column(nullable = false, columnDefinition = "ENUM('active','pending_admin','blocked')")
+    @Column(nullable = false, columnDefinition = "ENUM('active','blocked')")
     @Builder.Default
     private UserStatus status = UserStatus.ACTIVE;
+
+    @Column(name = "adhar_card", unique = true, length = 20)
+    private String adharCard;
 
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
