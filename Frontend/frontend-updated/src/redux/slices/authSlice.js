@@ -22,9 +22,15 @@ const authSlice = createSlice({
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
+    },
+    // Called when profile information is updated
+    updateUser: (state, action) => {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload };
+      }
     }
   }
 });
 
-export const { loginSuccess, logout } = authSlice.actions;
+export const { loginSuccess, logout, updateUser } = authSlice.actions;
 export default authSlice.reducer;

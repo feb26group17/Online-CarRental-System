@@ -14,12 +14,13 @@ public class UserResponse {
     private UserStatus status;
     private String address;
     private String adharCard;
+    private String drivingLicense;
     private LocalDateTime createdAt;
 
     public UserResponse() {
     }
 
-    public UserResponse(Integer id, String name, String email, String phone, Role role, UserStatus status, String address, String adharCard, LocalDateTime createdAt) {
+    public UserResponse(Integer id, String name, String email, String phone, Role role, UserStatus status, String address, String adharCard, String drivingLicense, LocalDateTime createdAt) {
         this.id = id;
         this.name = name;
         this.email = email;
@@ -28,6 +29,7 @@ public class UserResponse {
         this.status = status;
         this.address = address;
         this.adharCard = adharCard;
+        this.drivingLicense = drivingLicense;
         this.createdAt = createdAt;
     }
 
@@ -95,6 +97,14 @@ public class UserResponse {
         this.adharCard = adharCard;
     }
 
+    public String getDrivingLicense() {
+        return drivingLicense;
+    }
+
+    public void setDrivingLicense(String drivingLicense) {
+        this.drivingLicense = drivingLicense;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -116,6 +126,7 @@ public class UserResponse {
         private UserStatus status;
         private String address;
         private String adharCard;
+        private String drivingLicense;
         private LocalDateTime createdAt;
 
         public UserResponseBuilder id(Integer id) {
@@ -158,13 +169,18 @@ public class UserResponse {
             return this;
         }
 
+        public UserResponseBuilder drivingLicense(String drivingLicense) {
+            this.drivingLicense = drivingLicense;
+            return this;
+        }
+
         public UserResponseBuilder createdAt(LocalDateTime createdAt) {
             this.createdAt = createdAt;
             return this;
         }
 
         public UserResponse build() {
-            return new UserResponse(id, name, email, phone, role, status, address, adharCard, createdAt);
+            return new UserResponse(id, name, email, phone, role, status, address, adharCard, drivingLicense, createdAt);
         }
     }
 }

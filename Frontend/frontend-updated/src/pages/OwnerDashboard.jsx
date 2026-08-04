@@ -8,6 +8,7 @@ import MyVehicles   from './owner/MyVehicles';
 import Requests     from './owner/Requests';
 import ActiveRentals from './owner/ActiveRentals';
 import Earnings     from './owner/Earnings';
+import Profile      from './common/Profile';
 
 const menuItems = [
   { key: 'overview',  label: 'Overview',       icon: '📊', sub: 'Stats + earnings'   },
@@ -15,6 +16,7 @@ const menuItems = [
   { key: 'requests',  label: 'Requests',       icon: '📋', sub: 'Approve / reject'   },
   { key: 'rentals',   label: 'Active Rentals', icon: '🔑', sub: 'Ongoing trips'      },
   { key: 'earnings',  label: 'Earnings',       icon: '💰', sub: 'Revenue report'     },
+  { key: 'profile',   label: 'My Profile',      icon: '👤', sub: 'View & edit details' },
 ];
 
 function OwnerDashboard() {
@@ -35,6 +37,7 @@ function OwnerDashboard() {
       case 'requests': return <Requests />;
       case 'rentals':  return <ActiveRentals />;
       case 'earnings': return <Earnings />;
+      case 'profile':  return <Profile />;
       default:         return <Overview onNavigate={handleNavigate} />;
     }
   };

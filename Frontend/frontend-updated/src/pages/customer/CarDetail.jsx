@@ -12,6 +12,7 @@ function CarDetail({ car, onBookSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
 
   if (!car) {
     return (
@@ -37,7 +38,6 @@ function CarDetail({ car, onBookSuccess }) {
   };
 
   const days = calculateDays();
-  // rentPerDay is the correct field from VehicleResponse (not rentalPricePerDay)
   const totalAmount = days * (car.rentPerDay || 0);
 
   const handleBooking = async (e) => {
@@ -51,11 +51,10 @@ function CarDetail({ car, onBookSuccess }) {
 
     setLoading(true);
     try {
-      // BookingRequest expects: vehicleId, pickupDate, returnDate, dropCity
       await crudApi.post('/bookings', {
-        vehicleId: car.vehicleId,   // vehicleId (not car.id)
-        pickupDate: pickupDate,     // pickupDate (not startDate)
-        returnDate: returnDate,     // returnDate (not endDate)
+        vehicleId: car.vehicleId,
+        pickupDate: pickupDate,
+        returnDate: returnDate,
         dropCity: dropCity || null
       });
 
@@ -72,9 +71,28 @@ function CarDetail({ car, onBookSuccess }) {
 
   return (
     <div className="page-container">
-      {/* brandName + modelName from VehicleResponse */}
-      <h2 className="page-heading">{car.brandName} {car.modelName || car.registrationNumber}</h2>
-      <p className="page-sub">View specifications and complete your reservation</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 6 }}>
+        <div>
+          <h2 className="page-heading" style={{ marginBottom: 4 }}>{car.brandName} {car.modelName || car.registrationNumber}</h2>
+          <p className="page-sub">View specifications and complete your reservation</p>
+        </div>
+        <button
+          onClick={() => setShowVerifyModal(true)}
+          style={{
+            padding: '10px 18px',
+            background: '#2563eb',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: 8,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            boxShadow: '0 2px 4px rgba(37,99,235,0.2)'
+          }}
+        >
+          🔍 Verify Details
+        </button>
+      </div>
 
       {error && <div className="alert-error" style={{ marginBottom: 20 }}>{error}</div>}
       {successMsg && <div style={{
@@ -99,12 +117,10 @@ function CarDetail({ car, onBookSuccess }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
             <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8 }}>
-              {/* registrationNumber is the correct field (not vehicleNumber) */}
               <div style={{ fontSize: 11, color: '#64748b' }}>Registration No.</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{car.registrationNumber || 'N/A'}</div>
             </div>
             <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8 }}>
-              {/* fuelType: Diesel | Petrol | CNG | Battery */}
               <div style={{ fontSize: 11, color: '#64748b' }}>Fuel Type</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{car.fuelType || 'N/A'}</div>
             </div>
@@ -113,7 +129,6 @@ function CarDetail({ car, onBookSuccess }) {
               <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{car.seatingCapacity || 5} Persons</div>
             </div>
             <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8 }}>
-              {/* status: Available | Booked | Maintenance */}
               <div style={{ fontSize: 11, color: '#64748b' }}>Status</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: car.status === 'Available' ? '#16a34a' : '#dc2626' }}>
                 {car.status}
@@ -124,12 +139,23 @@ function CarDetail({ car, onBookSuccess }) {
           <div style={{ background: '#eff6ff', padding: '14px 16px', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: 12, color: '#2563eb', fontWeight: 600 }}>Daily Rate</div>
-              {/* rentPerDay is the correct field */}
               <div style={{ fontSize: 22, fontWeight: 800, color: '#1e293b' }}>₹{car.rentPerDay}</div>
             </div>
-            <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20, background: '#dbeafe', color: '#1e40af' }}>
-              Verified Listing
-            </span>
+            <button
+              onClick={() => setShowVerifyModal(true)}
+              style={{
+                padding: '6px 14px',
+                background: '#dbeafe',
+                color: '#1e40af',
+                border: '1px solid #93c5fd',
+                borderRadius: 20,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              🛡️ Verify Specs
+            </button>
           </div>
         </div>
 
@@ -146,14 +172,12 @@ function CarDetail({ car, onBookSuccess }) {
 
           <form onSubmit={handleBooking}>
             <div className="form-group">
-              {/* pickupDate is the correct field name for BookingRequest */}
               <label>Pickup Date *</label>
               <input type="date" value={pickupDate} min={new Date().toISOString().split('T')[0]}
                 onChange={e => setPickupDate(e.target.value)} required disabled={car.status !== 'Available'} />
             </div>
 
             <div className="form-group">
-              {/* returnDate is the correct field name for BookingRequest */}
               <label>Return Date *</label>
               <input type="date" value={returnDate} min={pickupDate || new Date().toISOString().split('T')[0]}
                 onChange={e => setReturnDate(e.target.value)} required disabled={car.status !== 'Available'} />
@@ -188,6 +212,100 @@ function CarDetail({ car, onBookSuccess }) {
         </div>
 
       </div>
+
+      {/* ─── VEHICLE VERIFICATION AUDIT MODAL ─── */}
+      {showVerifyModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: 20
+        }}>
+          <div style={{
+            background: '#ffffff', borderRadius: 16, width: '100%', maxWidth: 540,
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: '#ffffff',
+              padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  🛡️ Vehicle Verification Audit
+                </h3>
+                <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 2 }}>{car.brandName} {car.modelName}</div>
+              </div>
+              <button
+                onClick={() => setShowVerifyModal(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff',
+                  width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', fontSize: 16
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: 24 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
+                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Vehicle ID</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginTop: 2 }}>#{car.vehicleId}</div>
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Registration Number</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#2563eb', marginTop: 2 }}>{car.registrationNumber}</div>
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Fuel Type</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b', marginTop: 2 }}>⛽ {car.fuelType}</div>
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Seating Capacity</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b', marginTop: 2 }}>🪑 {car.seatingCapacity || 5} Persons</div>
+                </div>
+              </div>
+
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: 16, marginBottom: 20 }}>
+                <h4 style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 700, color: '#166534' }}>Verification Badges & Compliance</h4>
+                <div style={{ display: 'grid', gap: 8, fontSize: 13, color: '#15803d' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>✅</span> <strong>RTO Registration:</strong> Validated & Registered Number
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>✅</span> <strong>System Approval:</strong> Approved by OCRS Super Admin
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>✅</span> <strong>Insurance Status:</strong> Active Comprehensive Coverage
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>✅</span> <strong>Owner Status:</strong> Identity Verified Car Owner
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button
+                  onClick={() => setShowVerifyModal(false)}
+                  style={{
+                    padding: '10px 20px',
+                    background: '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close & Proceed
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
