@@ -14,41 +14,56 @@ import { crudApi } from '../../api/axios';
 
 const FUEL_TYPES = ['Diesel', 'Petrol', 'CNG', 'Battery'];
 
-function AddVehicleModal({ onClose, onAddSuccess }) {
+function AddEditVehicleModal({ onClose, onSuccess, initialData = null }) {
   const [brands, setBrands] = useState([]);
   const [allModels, setAllModels] = useState([]);
   const [models, setModels] = useState([]);
   const [form, setForm] = useState({
     brandId: '',
-    modelId: '',
-    registrationNumber: '',
-    fuelType: '',
-    rentPerDay: '',
+    modelId: initialData?.modelId ? String(initialData.modelId) : '',
+    registrationNumber: initialData?.registrationNumber || '',
+    fuelType: initialData?.fuelType || '',
+    rentPerDay: initialData?.rentPerDay !== undefined ? String(initialData.rentPerDay) : '',
+    status: initialData?.status || 'Available'
   });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
 
   useEffect(() => {
-    fetchBrands();
-    fetchAllModels();
+    fetchBrandsAndInitialModels();
   }, []);
 
-  const fetchBrands = async () => {
+  const fetchBrandsAndInitialModels = async () => {
     try {
       const res = await crudApi.get('/brands');
-      setBrands(res.data || []);
-    } catch (e) {
-      console.error('Failed to load brands', e);
-    }
-  };
+      const brandList = res.data || [];
+      setBrands(brandList);
 
-  const fetchAllModels = async () => {
-    try {
-      const res = await crudApi.get('/models');
-      setAllModels(res.data || []);
-      setModels(res.data || []);
+      const mRes = await crudApi.get('/models');
+      const modelList = mRes.data || [];
+      setAllModels(modelList);
+
+      if (initialData) {
+        let currentBrandId = null;
+        if (initialData.brandName) {
+          const matchedBrand = brandList.find(b => b.bname === initialData.brandName);
+          if (matchedBrand) {
+            currentBrandId = String(matchedBrand.brandId);
+          }
+        }
+
+        if (currentBrandId) {
+          setForm(f => ({ ...f, brandId: currentBrandId }));
+          const filtered = modelList.filter(m => String(m.brandId) === currentBrandId);
+          setModels(filtered.length > 0 ? filtered : modelList);
+        } else {
+          setModels(modelList);
+        }
+      } else {
+        setModels(modelList);
+      }
     } catch (e) {
-      console.error('Failed to load models', e);
+      console.error('Failed to load brands/models', e);
     }
   };
 
@@ -84,17 +99,24 @@ function AddVehicleModal({ onClose, onAddSuccess }) {
     setLoading(true);
     setErr('');
     try {
-      await crudApi.post('/vehicles', {
+      const payload = {
         modelId: parseInt(form.modelId),
         registrationNumber: form.registrationNumber,
         fuelType: form.fuelType,
         rentPerDay: parseFloat(form.rentPerDay),
-        status: 'Available'
-      });
-      onAddSuccess();
+        status: form.status
+      };
+
+      if (initialData?.vehicleId) {
+        await crudApi.put(`/vehicles/${initialData.vehicleId}`, payload);
+      } else {
+        await crudApi.post('/vehicles', payload);
+      }
+
+      onSuccess();
       onClose();
     } catch (error) {
-      setErr(error.response?.data?.message || 'Failed to add vehicle');
+      setErr(error.response?.data?.message || 'Failed to save vehicle details');
     } finally {
       setLoading(false);
     }
@@ -109,16 +131,18 @@ function AddVehicleModal({ onClose, onAddSuccess }) {
         background: '#fff', borderRadius: 14, padding: '28px', width: '100%', maxWidth: 480,
         boxShadow: '0 8px 32px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto'
       }}>
-        <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 18 }}>Add New Vehicle</h3>
+        <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 18 }}>
+          {initialData ? '✏️ Edit Vehicle Details' : '🚗 Add New Vehicle'}
+        </h3>
 
         {err && <div className="alert-error" style={{ marginBottom: 14 }}>{err}</div>}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Car Brand (Optional Filter)</label>
-            <select value={form.brandId} onChange={e => handleBrandChange(e.target.value)}
+            <label>Car Brand *</label>
+            <select value={form.brandId} onChange={e => handleBrandChange(e.target.value)} required
               style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14 }}>
-              <option value="">All Brands</option>
+              <option value="">Select Brand</option>
               {brands.map(b => <option key={b.brandId} value={b.brandId}>{b.bname}</option>)}
             </select>
           </div>
@@ -127,7 +151,7 @@ function AddVehicleModal({ onClose, onAddSuccess }) {
             <label>Car Model *</label>
             <select value={form.modelId} onChange={e => handleModelChange(e.target.value)} required
               style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14 }}>
-              <option value="">Select Car Model</option>
+              <option value="">Select Model</option>
               {models.map(m => (
                 <option key={m.modelId} value={m.modelId}>
                   {m.brandName ? `${m.brandName} ` : ''}{m.modelName} ({m.seatingCapacity} seats)
@@ -157,13 +181,21 @@ function AddVehicleModal({ onClose, onAddSuccess }) {
               onChange={e => setForm({ ...form, rentPerDay: e.target.value })} required />
           </div>
 
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#64748b' }}>
-            ℹ️ Vehicle will be listed as <strong>Available</strong> immediately after submission.
-          </div>
+          {initialData && (
+            <div className="form-group">
+              <label>Availability Status</label>
+              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
+                style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14 }}>
+                <option value="Available">Available</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Booked" disabled>Booked (Controlled by Customer Bookings)</option>
+              </select>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
             <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Submitting...' : 'Add Vehicle'}
+              {loading ? 'Saving...' : (initialData ? 'Save Changes' : 'Add Vehicle')}
             </button>
             <button type="button" onClick={onClose} style={{
               flex: 1, padding: '12px', background: '#f1f5f9', border: 'none', borderRadius: 8,
@@ -181,6 +213,7 @@ function MyVehicles() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
 
   useEffect(() => {
@@ -231,10 +264,10 @@ function MyVehicles() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <h2 className="page-heading">My Vehicles</h2>
-          <p className="page-sub">Manage your listed rental fleet</p>
+          <p className="page-sub">Manage and edit your listed rental fleet</p>
         </div>
         <button className="btn-primary" style={{ width: 'auto', padding: '10px 20px', marginTop: 0 }}
-          onClick={() => setShowModal(true)}>
+          onClick={() => { setEditingVehicle(null); setShowModal(true); }}>
           + Add Vehicle
         </button>
       </div>
@@ -289,13 +322,19 @@ function MyVehicles() {
                   </div>
 
                   <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
+                    <button onClick={() => setEditingVehicle(car)} style={{
+                      padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      border: '1px solid #cbd5e1', borderRadius: 7, background: '#f1f5f9', color: '#334155'
+                    }}>
+                      ✏️ Edit
+                    </button>
                     <button onClick={() => toggleStatus(car)} disabled={car.status === 'Booked'} style={{
                       flex: 1, padding: '7px', fontSize: 12, fontWeight: 600, cursor: car.status === 'Booked' ? 'not-allowed' : 'pointer',
                       border: '1px solid #e2e8f0', borderRadius: 7,
                       background: car.status === 'Booked' ? '#f1f5f9' : '#f8fafc', color: '#475569',
                       opacity: car.status === 'Booked' ? 0.6 : 1
                     }}>
-                      {car.status === 'Available' ? '⏸ Set Maintenance' : car.status === 'Maintenance' ? '✅ Set Available' : '🔒 Booked'}
+                      {car.status === 'Available' ? '⏸ Maintenance' : car.status === 'Maintenance' ? '✅ Available' : '🔒 Booked'}
                     </button>
                     <button onClick={() => setDeleteId(car.vehicleId)} style={{
                       padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
@@ -311,10 +350,11 @@ function MyVehicles() {
         </div>
       )}
 
-      {showModal && (
-        <AddVehicleModal
-          onClose={() => setShowModal(false)}
-          onAddSuccess={fetchMyVehicles}
+      {(showModal || editingVehicle) && (
+        <AddEditVehicleModal
+          initialData={editingVehicle}
+          onClose={() => { setShowModal(false); setEditingVehicle(null); }}
+          onSuccess={fetchMyVehicles}
         />
       )}
 
