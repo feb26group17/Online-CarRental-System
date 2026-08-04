@@ -15,29 +15,52 @@ import { crudApi } from '../../api/axios';
 
 const FUEL_TYPES = ['Diesel', 'Petrol', 'CNG', 'Battery'];
 
-function AddVehicleModal({ onClose, onAddSuccess }) {
+function AddEditVehicleModal({ onClose, onSuccess, initialData = null }) {
   const [brands, setBrands] = useState([]);
   const [models, setModels] = useState([]);
   const [form, setForm] = useState({
     brandId: '',
-    modelId: '',
-    registrationNumber: '',  // correct field name
-    fuelType: '',            // required by backend
-    rentPerDay: '',          // correct field name
+    modelId: initialData?.modelId ? String(initialData.modelId) : '',
+    registrationNumber: initialData?.registrationNumber || '',
+    fuelType: initialData?.fuelType || '',
+    rentPerDay: initialData?.rentPerDay !== undefined ? String(initialData.rentPerDay) : '',
+    status: initialData?.status || 'Available'
   });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
 
   useEffect(() => {
-    fetchBrands();
+    fetchBrandsAndInitialModels();
   }, []);
 
-  const fetchBrands = async () => {
+  const fetchBrandsAndInitialModels = async () => {
     try {
       const res = await crudApi.get('/brands');
-      setBrands(res.data || []);
+      const brandList = res.data || [];
+      setBrands(brandList);
+
+      if (initialData) {
+        // Find brandId from brandName if modelId exists
+        let currentBrandId = null;
+        if (initialData.brandName) {
+          const matchedBrand = brandList.find(b => b.bname === initialData.brandName);
+          if (matchedBrand) {
+            currentBrandId = String(matchedBrand.brandId);
+          }
+        }
+
+        if (currentBrandId) {
+          setForm(f => ({ ...f, brandId: currentBrandId }));
+          const mRes = await crudApi.get(`/models?brandId=${currentBrandId}`);
+          setModels(mRes.data || []);
+        } else {
+          // Fetch all models if brand not matched directly
+          const mRes = await crudApi.get('/models');
+          setModels(mRes.data || []);
+        }
+      }
     } catch (e) {
-      console.error('Failed to load brands', e);
+      console.error('Failed to load brands/models', e);
     }
   };
 
@@ -64,18 +87,26 @@ function AddVehicleModal({ onClose, onAddSuccess }) {
     setLoading(true);
     setErr('');
     try {
-      // VehicleRequest: modelId, registrationNumber, fuelType, rentPerDay, status
-      await crudApi.post('/vehicles', {
+      const payload = {
         modelId: parseInt(form.modelId),
         registrationNumber: form.registrationNumber,
-        fuelType: form.fuelType,                         // must match FuelType enum exactly
+        fuelType: form.fuelType,
         rentPerDay: parseFloat(form.rentPerDay),
-        status: 'Available'                              // VehicleStatus.Available
-      });
-      onAddSuccess();
+        status: form.status
+      };
+
+      if (initialData?.vehicleId) {
+        // Edit existing vehicle
+        await crudApi.put(`/vehicles/${initialData.vehicleId}`, payload);
+      } else {
+        // Add new vehicle
+        await crudApi.post('/vehicles', payload);
+      }
+
+      onSuccess();
       onClose();
     } catch (error) {
-      setErr(error.response?.data?.message || 'Failed to add vehicle');
+      setErr(error.response?.data?.message || 'Failed to save vehicle details');
     } finally {
       setLoading(false);
     }
@@ -90,14 +121,15 @@ function AddVehicleModal({ onClose, onAddSuccess }) {
         background: '#fff', borderRadius: 14, padding: '28px', width: '100%', maxWidth: 480,
         boxShadow: '0 8px 32px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto'
       }}>
-        <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 18 }}>Add New Vehicle</h3>
+        <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 18 }}>
+          {initialData ? '✏️ Edit Vehicle Details' : '🚗 Add New Vehicle'}
+        </h3>
 
         {err && <div className="alert-error" style={{ marginBottom: 14 }}>{err}</div>}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Car Brand *</label>
-            {/* BrandResponse: brandId, bname */}
             <select value={form.brandId} onChange={e => handleBrandChange(e.target.value)} required
               style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14 }}>
               <option value="">Select Brand</option>
@@ -107,23 +139,20 @@ function AddVehicleModal({ onClose, onAddSuccess }) {
 
           <div className="form-group">
             <label>Car Model *</label>
-            {/* ModelResponse: modelId, modelName, seatingCapacity */}
-            <select value={form.modelId} onChange={e => setForm({ ...form, modelId: e.target.value })} required disabled={!form.brandId}
-              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, opacity: !form.brandId ? 0.6 : 1 }}>
+            <select value={form.modelId} onChange={e => setForm({ ...form, modelId: e.target.value })} required disabled={!form.brandId && models.length === 0}
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, opacity: (!form.brandId && models.length === 0) ? 0.6 : 1 }}>
               <option value="">Select Model</option>
               {models.map(m => <option key={m.modelId} value={m.modelId}>{m.modelName} ({m.seatingCapacity} seats)</option>)}
             </select>
           </div>
 
           <div className="form-group">
-            {/* registrationNumber is the correct field name (not vehicleNumber) */}
             <label>Registration Number *</label>
             <input type="text" placeholder="e.g. MH12AB1234" value={form.registrationNumber}
               onChange={e => setForm({ ...form, registrationNumber: e.target.value })} required />
           </div>
 
           <div className="form-group">
-            {/* fuelType is required — FuelType enum: Diesel | Petrol | CNG | Battery */}
             <label>Fuel Type *</label>
             <select value={form.fuelType} onChange={e => setForm({ ...form, fuelType: e.target.value })} required
               style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14 }}>
@@ -133,19 +162,26 @@ function AddVehicleModal({ onClose, onAddSuccess }) {
           </div>
 
           <div className="form-group">
-            {/* rentPerDay is the correct field name (not rentalPricePerDay) */}
             <label>Daily Rental Rate (₹) *</label>
             <input type="number" step="0.01" placeholder="e.g. 1500" value={form.rentPerDay}
               onChange={e => setForm({ ...form, rentPerDay: e.target.value })} required />
           </div>
 
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#64748b' }}>
-            ℹ️ Vehicle will be listed as <strong>Available</strong> immediately after submission.
-          </div>
+          {initialData && (
+            <div className="form-group">
+              <label>Availability Status</label>
+              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
+                style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14 }}>
+                <option value="Available">Available</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Booked" disabled>Booked (Controlled by Customer Bookings)</option>
+              </select>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
             <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Submitting...' : 'Add Vehicle'}
+              {loading ? 'Saving...' : (initialData ? 'Save Changes' : 'Add Vehicle')}
             </button>
             <button type="button" onClick={onClose} style={{
               flex: 1, padding: '12px', background: '#f1f5f9', border: 'none', borderRadius: 8,
@@ -163,6 +199,7 @@ function MyVehicles() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
 
   useEffect(() => {
@@ -183,10 +220,8 @@ function MyVehicles() {
   };
 
   const toggleStatus = async (car) => {
-    // VehicleStatus enum: Available | Booked | Maintenance
     const newStatus = car.status === 'Available' ? 'Maintenance' : 'Available';
     try {
-      // vehicleId is the correct id field
       await crudApi.patch(`/vehicles/${car.vehicleId}/status`, { status: newStatus });
       fetchMyVehicles();
     } catch (err) {
@@ -204,7 +239,6 @@ function MyVehicles() {
     }
   };
 
-  // VehicleStatus: Available | Booked | Maintenance
   const statusStyle = (status) => {
     if (status === 'Available')   return { bg: '#f0fdf4', text: '#16a34a' };
     if (status === 'Booked')      return { bg: '#eff6ff', text: '#2563eb' };
@@ -216,10 +250,10 @@ function MyVehicles() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <h2 className="page-heading">My Vehicles</h2>
-          <p className="page-sub">Manage your listed rental fleet</p>
+          <p className="page-sub">Manage and edit your listed rental fleet</p>
         </div>
         <button className="btn-primary" style={{ width: 'auto', padding: '10px 20px', marginTop: 0 }}
-          onClick={() => setShowModal(true)}>
+          onClick={() => { setEditingVehicle(null); setShowModal(true); }}>
           + Add Vehicle
         </button>
       </div>
@@ -237,8 +271,6 @@ function MyVehicles() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {vehicles.map(car => {
-            // VehicleResponse: vehicleId, modelId, modelName, brandName,
-            //                  seatingCapacity, registrationNumber, fuelType, rentPerDay, status
             const ss = statusStyle(car.status);
             return (
               <div key={car.vehicleId} style={{
@@ -268,24 +300,27 @@ function MyVehicles() {
                   <div style={{ fontSize: 12, color: '#64748b', display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
                     <span>⛽ {car.fuelType || 'N/A'}</span>
                     <span>🪑 {car.seatingCapacity || 5} seats</span>
-                    {/* registrationNumber is the correct field */}
                     <span>🔖 {car.registrationNumber}</span>
                   </div>
 
                   <div style={{ fontSize: 17, fontWeight: 800, color: '#2563eb', marginBottom: 14 }}>
-                    {/* rentPerDay is the correct field */}
                     ₹{car.rentPerDay}<span style={{ fontSize: 12, fontWeight: 400, color: '#94a3b8' }}>/day</span>
                   </div>
 
                   <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
-                    {/* Only allow toggling if not Booked (can't un-book manually) */}
+                    <button onClick={() => setEditingVehicle(car)} style={{
+                      padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      border: '1px solid #cbd5e1', borderRadius: 7, background: '#f1f5f9', color: '#334155'
+                    }}>
+                      ✏️ Edit
+                    </button>
                     <button onClick={() => toggleStatus(car)} disabled={car.status === 'Booked'} style={{
                       flex: 1, padding: '7px', fontSize: 12, fontWeight: 600, cursor: car.status === 'Booked' ? 'not-allowed' : 'pointer',
                       border: '1px solid #e2e8f0', borderRadius: 7,
                       background: car.status === 'Booked' ? '#f1f5f9' : '#f8fafc', color: '#475569',
                       opacity: car.status === 'Booked' ? 0.6 : 1
                     }}>
-                      {car.status === 'Available' ? '⏸ Set Maintenance' : car.status === 'Maintenance' ? '✅ Set Available' : '🔒 Booked'}
+                      {car.status === 'Available' ? '⏸ Maintenance' : car.status === 'Maintenance' ? '✅ Available' : '🔒 Booked'}
                     </button>
                     <button onClick={() => setDeleteId(car.vehicleId)} style={{
                       padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
@@ -301,10 +336,11 @@ function MyVehicles() {
         </div>
       )}
 
-      {showModal && (
-        <AddVehicleModal
-          onClose={() => setShowModal(false)}
-          onAddSuccess={fetchMyVehicles}
+      {(showModal || editingVehicle) && (
+        <AddEditVehicleModal
+          initialData={editingVehicle}
+          onClose={() => { setShowModal(false); setEditingVehicle(null); }}
+          onSuccess={fetchMyVehicles}
         />
       )}
 

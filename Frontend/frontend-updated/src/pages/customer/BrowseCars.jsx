@@ -212,15 +212,25 @@ function BrowseCars({ onSelectCar }) {
 
                   <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
                     <div>
-                      {/* rentPerDay is the correct field name from VehicleResponse */}
                       <span style={{ fontSize: 18, fontWeight: 800, color: '#1e293b' }}>₹{car.rentPerDay}</span>
                       <span style={{ fontSize: 12, color: '#94a3b8' }}>/day</span>
                     </div>
-                    <button className="btn-primary" style={{ width: 'auto', padding: '8px 16px', marginTop: 0 }}
-                      onClick={() => onSelectCar && onSelectCar(car)}
-                      disabled={car.status !== 'Available'}>
-                      {car.status === 'Available' ? 'Book Now' : car.status}
-                    </button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => onSelectCar && onSelectCar(car)}
+                        style={{
+                          padding: '8px 12px', background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1',
+                          borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer'
+                        }}
+                      >
+                        🔍 Verify Details
+                      </button>
+                      <button className="btn-primary" style={{ width: 'auto', padding: '8px 16px', marginTop: 0 }}
+                        onClick={() => onSelectCar && onSelectCar(car)}
+                        disabled={car.status !== 'Available'}>
+                        {car.status === 'Available' ? 'Book Now' : car.status}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

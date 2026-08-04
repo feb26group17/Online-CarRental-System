@@ -7,6 +7,7 @@ import CarDetail  from './customer/CarDetail';
 import MyBookings from './customer/MyBookings';
 import Payments   from './customer/Payments';
 import MyReviews  from './customer/MyReviews';
+import Profile    from './common/Profile';
 
 const menuItems = [
   { key: 'browse',   label: 'Browse Cars',  icon: '🚗', sub: 'Search + filter'   },
@@ -14,6 +15,7 @@ const menuItems = [
   { key: 'bookings', label: 'My Bookings',  icon: '📅', sub: 'Active + history'  },
   { key: 'payments', label: 'Payments',     icon: '💳', sub: 'History + refunds' },
   { key: 'reviews',  label: 'My Reviews',   icon: '⭐', sub: 'Submit feedback'   },
+  { key: 'profile',  label: 'My Profile',   icon: '👤', sub: 'View & edit details' },
 ];
 
 function CustomerDashboard() {
@@ -37,6 +39,7 @@ function CustomerDashboard() {
       case 'bookings': return <MyBookings />;
       case 'payments': return <Payments />;
       case 'reviews':  return <MyReviews />;
+      case 'profile':  return <Profile />;
       default:         return <BrowseCars onSelectCar={handleSelectCar} />;
     }
   };
